@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic
+trueskill
+pandas
+python-multipart
+pytest
+httpx
+scipy
+google-cloud-firestore
