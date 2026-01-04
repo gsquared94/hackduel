@@ -13,8 +13,8 @@ class Project(BaseModel):
     project_links: Optional[str] = ""
     # TrueSkill ratings
     mu: float = 25.0
-    mu: float = 25.0
     sigma: float = 8.333
+    matches_played: int = 0
     active: bool = True
     
     model_config = ConfigDict(arbitrary_types_allowed=True)

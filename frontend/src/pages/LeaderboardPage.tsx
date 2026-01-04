@@ -11,18 +11,18 @@ export default function LeaderboardPage() {
     }, [category]);
 
     // Calculate Global Confidence
-    // Initial Sigma is 8.333. As matches happen, Sigma decreases.
-    // Confidence % = (1 - (Avg Current Sigma / Initial Sigma)) * 100
-    const INITIAL_SIGMA = 8.333;
-    const avgSigma = projects.length > 0
-        ? projects.reduce((acc, p) => acc + p.sigma, 0) / projects.length
-        : INITIAL_SIGMA;
+    // Calculate Global Confidence based on Vote Saturation
+    // We aim for the Top 50 projects to have at least N matches to be "confident".
+    // 10 matches is a good saturation point for a hackathon.
+    const TARGET_MATCHES = 10;
 
-    // We cap confidence at 0% minimum (though sigma shouldn't go above initial basically)
-    // and scale it. Truly converging to 0 sigma is infinite play, so let's say 
-    // sigma < 3 is "Very High Confidence" (approx 70%+ raw match).
-    // Let's map 8.333 -> 0% and 1.0 -> 100% for practically "done".
-    const rawConfidence = Math.max(0, (INITIAL_SIGMA - avgSigma) / (INITIAL_SIGMA - 1.0)) * 100;
+    // Calculate average matches played by the displayed projects
+    // Note: Project type might need update in lib/api.ts but since it's JS at runtime, it's fine.
+    // If TypeScript complains, we need to update the interface.
+    const totalMatches = projects.reduce((acc, p) => acc + (p['matches_played'] || 0), 0);
+    const avgMatches = projects.length > 0 ? totalMatches / projects.length : 0;
+
+    const rawConfidence = (avgMatches / TARGET_MATCHES) * 100;
     const confidence = Math.min(100, rawConfidence);
 
     return (
@@ -50,8 +50,8 @@ export default function LeaderboardPage() {
                 <div className="bg-slate-900/50 p-6 rounded-xl border border-white/10 backdrop-blur-sm md:col-span-2">
                     <div className="flex justify-between items-end mb-2">
                         <div>
-                            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-1">Leaderboard Confidence</h2>
-                            <p className="text-xs text-slate-500">Based on statistical uncertainty reduction over {projects.length} projects</p>
+                            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-1">Ranking Confidence</h2>
+                            <p className="text-xs text-slate-500">Based on vote saturation (Avg {avgMatches.toFixed(1)} matches/project)</p>
                         </div>
                         <div className="text-3xl font-black text-white">
                             {confidence.toFixed(1)}%
@@ -74,7 +74,7 @@ export default function LeaderboardPage() {
                         {confidence < 20 && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
                         {confidence >= 20 && confidence < 80 && <span className="w-2 h-2 rounded-full bg-yellow-500" />}
                         {confidence >= 80 && <span className="w-2 h-2 rounded-full bg-green-500" />}
-                        {confidence < 20 ? 'Gathering Data' : confidence < 80 ? 'Converging' : 'Statistically Significant'}
+                        {confidence < 20 ? 'Early Voting' : confidence < 80 ? 'Active Judging' : 'Rankings Stabilized'}
                     </div>
                 </div>
             </div>
@@ -116,8 +116,13 @@ export default function LeaderboardPage() {
                                         {p.category}
                                     </span>
                                 </td>
-                                <td className="p-4 text-right font-mono text-indigo-300">
-                                    {p.mu.toFixed(2)}
+                                <td className="p-4 text-right">
+                                    <span
+                                        className="font-mono text-indigo-300 cursor-help"
+                                        title={`${p.matches_played || 0} matches played`}
+                                    >
+                                        {p.mu.toFixed(2)}
+                                    </span>
                                 </td>
                             </tr>
                         ))}

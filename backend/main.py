@@ -73,8 +73,11 @@ async def process_votes():
                 # 3. Update Objects
                 winner.mu = new_w[0].mu
                 winner.sigma = new_w[0].sigma
+                winner.matches_played += 1
+                
                 loser.mu = new_l[0].mu
                 loser.sigma = new_l[0].sigma
+                loser.matches_played += 1
                 
                 return winner, loser
 
@@ -223,8 +226,9 @@ def reset_rankings():
     for p in all_p:
         p.mu = 25.0
         p.sigma = 8.333
+        p.active = True
         repo.update(p)
-    return {"status": "reset"}
+    return {"status": "reset", "count": len(all_p)}
 
 @app.post("/projects/{project_id}/ignore")
 def ignore_project(project_id: str):

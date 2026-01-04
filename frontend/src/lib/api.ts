@@ -14,6 +14,7 @@ export interface Project {
     project_links?: string;
     mu: number;
     sigma: number;
+    matches_played: number;
 }
 
 export interface PairResponse {
