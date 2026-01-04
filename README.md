@@ -10,8 +10,9 @@ An intelligent pairwise voting application designed to rank hackathon projects u
 - **Pairwise Voting**: Simple "Left vs Right" interface.
 - **TrueSkill Ranking**: Real-time updates to project ratings ($\mu$) and uncertainty ($\sigma$).
 - **Active Learning**: Intelligently selects the next pair to maximize information gain (pairing projects with similar rank).
+- **Smart Pairing Diversity**: Heavily penalizes repeated pairings and strictly prevents judges from seeing the same pair twice to maximize broad coverage.
 - **Dual Persistence**: High-performance in-memory caching with asynchronous Firestore persistence.
-- **Cloud Ready**: Designed for deployment on Google Cloud Run.
+- **Cloud Ready**: Designed for deployment on Google Cloud Run with IAP authentication integration.
 
 ## Architecture
 
@@ -26,6 +27,7 @@ An intelligent pairwise voting application designed to rank hackathon projects u
 - Python 3.10+
 - Node.js 18+
 - Google Cloud SDK (`gcloud` CLI)
+- Docker
 
 ### 1. Data Preparation
 Ensure your project data is provided in CSV format. This project's dataset schema is based on the CSV export of [Kaggle's Gemini 3 Writeups](https://www.kaggle.com/competitions/gemini-3/writeups).
@@ -64,34 +66,27 @@ export DATASET_PATH="/Users/yourname/data/full_dataset.csv"
 ### 4. Running Verification Simulations
 To verify the ranking algorithm integrity:
 ```bash
-cd backend
-python -m pytest test_simulation.py
+python -m pytest tests/test_simulation.py
 ```
 
-### 5. Containerization
-To build the Docker image for Cloud Run (or local testing):
+Additional simulations and utility scripts can be found in `tests/`:
+- `tests/simulate_convergence.py`: Runs a fast simulation of the pairing/ranking loop.
+
+### 5. Cloud Deployment
+To deploy to Google Cloud Run:
 ```bash
-# Build the image
-docker build -t hackduel .
-
-# Run the container locally (with Firestore enabled)
-# Assumes GOOGLE_APPLICATION_CREDENTIALS points to your JSON key
-docker run \
-  -p 8080:8080 \
-  -e PORT=8080 \
-  -e USE_FIRESTORE=true \
-  -e GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:-your-project-id}" \
-  -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json \
-  -v "${GOOGLE_APPLICATION_CREDENTIALS}:/app/gcp-credentials.json" \
-  hackduel
+# Deploys using Cloud Build + Cloud Run
+./infra/deploy.sh
 ```
+This script handles building the Docker image, pushing to Artifact Registry, and deploying to Cloud Run with Firestore integration enabled. It enforces `no-allow-unauthenticated`, so you should set up IAP or an HTTP Load Balancer in front of it.
 
 ## Directory Structure
 ```
 judging-app/
 ├── backend/            # FastAPI application
 ├── frontend/           # React application
-├── infra/              # Setup and seeding scripts
+├── infra/              # Setup, seeding, and deployment scripts
+├── tests/              # Validations and simulations
 ├── start_dev.sh        # Local development startup script
 ├── Dockerfile          # Container definition
 └── README.md           # This file

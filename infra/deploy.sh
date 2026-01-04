@@ -29,13 +29,22 @@ fi
 echo "🔑 Configuring Docker authentication..."
 gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
 
-# 4. Build and Push (using local Docker)
-echo "🏗️ Building Docker image (AMD64)..."
-# Force AMD64 for Cloud Run compatibility
-docker build --platform linux/amd64 -t $IMAGE_URI .
+# Check for --skip-build argument
+SKIP_BUILD=false
+if [[ "$1" == "--skip-build" ]]; then
+    SKIP_BUILD=true
+    echo "⏩ Skipping build step as requested..."
+fi
 
-echo "Ee Pushing image to registry..."
-docker push $IMAGE_URI
+if [ "$SKIP_BUILD" = false ]; then
+    # 4. Build and Push (using local Docker)
+    echo "🏗️ Building Docker image (AMD64)..."
+    # Force AMD64 for Cloud Run compatibility
+    docker build --platform linux/amd64 -t $IMAGE_URI .
+
+    echo "Pushing image to registry..."
+    docker push $IMAGE_URI
+fi
 
 # 5. Deploy to Cloud Run
 echo "☁️ Deploying to Cloud Run..."
@@ -43,7 +52,7 @@ gcloud run deploy $APP_NAME \
     --image $IMAGE_URI \
     --region $REGION \
     --platform managed \
-    --allow-unauthenticated \
+    --no-allow-unauthenticated \
     --set-env-vars "USE_FIRESTORE=true" \
     --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT_ID" \
     --port 8080
