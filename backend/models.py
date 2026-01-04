@@ -1,5 +1,11 @@
 from pydantic import BaseModel, ConfigDict
-from typing import Optional
+from typing import Optional, List
+
+class JudgeInteraction(BaseModel):
+    judge_email: str
+    decision: str  # 'win' or 'loss'
+    opponent_id: str
+    timestamp: float
 
 class Project(BaseModel):
     id: str
@@ -16,12 +22,15 @@ class Project(BaseModel):
     sigma: float = 8.333
     matches_played: int = 0
     active: bool = True
+    judged_by: List[JudgeInteraction] = []
+    rank: Optional[int] = None # Global rank (1-based)
     
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 class VoteRequest(BaseModel):
     winner_id: str
     loser_id: str
+    judge_email: Optional[str] = None
 
 class PairResponse(BaseModel):
     project_a: Project

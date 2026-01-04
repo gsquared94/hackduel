@@ -15,6 +15,16 @@ export interface Project {
     mu: number;
     sigma: number;
     matches_played: number;
+    judged_by?: JudgeInteraction[];
+    active?: boolean;
+    rank?: number;
+}
+
+export interface JudgeInteraction {
+    judge_email: string;
+    decision: string;
+    opponent_id: string;
+    timestamp: number;
 }
 
 export interface PairResponse {
@@ -37,8 +47,21 @@ export const api = {
         const res = await axios.get<Project[]>(`${API_URL}/leaderboard`, { params });
         return res.data;
     },
+    searchProjects: async (query: string) => {
+        const res = await axios.get<Project[]>(`${API_URL}/projects/search`, { params: { query } });
+        return res.data;
+    },
     ignoreProject: async (projectId: string) => {
         const res = await axios.post(`${API_URL}/projects/${projectId}/ignore`);
+        return res.data;
+    },
+    unarchiveProject: async (projectId: string) => {
+        const res = await axios.post(`${API_URL}/projects/${projectId}/unarchive`);
+        return res.data;
+    },
+    getPairWith: async (projectId: string, opponentId?: string) => {
+        const params = opponentId ? { opponent_id: opponentId } : {};
+        const res = await axios.get<PairResponse>(`${API_URL}/projects/${projectId}/pair`, { params });
         return res.data;
     },
     getIgnoredProjects: async () => {

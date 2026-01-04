@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import type { Project, PairResponse } from '../lib/api';
 import ReactMarkdown from 'react-markdown';
@@ -17,7 +18,7 @@ const CRITERIA_INFO = {
     impact: {
         label: "Impact",
         weight: "40%",
-        description: "Does the application solve a real-world problem? Is the vision inspiring and does the solution have a tangible potential for positive change?"
+        description: "Does the application solve a real world problem? Is the vision inspiring and does the solution have a tangible potential for positive change?"
     },
     technical: {
         label: "Technical Depth & Execution",
@@ -92,8 +93,40 @@ export function JudgingPage() {
         }
     };
 
+    const location = useLocation();
+    const navigate = useNavigate();
+    const [initialLoadParams, setInitialLoadParams] = useState<string | null>(null);
+
+    // Effect: check URL params once on mount/location change
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const pid = params.get('projectId');
+        if (pid) {
+            setInitialLoadParams(pid);
+        }
+    }, [location.search]);
+
+
     const fetchPair = async (forceRefetch = false) => {
-        // If we already have a pair for this category and aren't forced to refresh, use it!
+        // 1. Priority: Targeted Project (One-time use)
+        if (initialLoadParams) {
+            setLoading(true);
+            try {
+                const data = await api.getPairWith(initialLoadParams);
+                setPair(data);
+                // Score reset handled by useEffect
+            } catch (err) {
+                console.error("Target project failed", err);
+                // Fallback to normal if target fails
+                setInitialLoadParams(null);
+                navigate('/', { replace: true });
+            } finally {
+                setLoading(false);
+            }
+            return;
+        }
+
+        // 2. Normal Logic: If we already have a pair for this category and aren't forced to refresh, use it!
         if (!forceRefetch && categoryPairs[filterCategory]) {
             setPair(categoryPairs[filterCategory]);
             return;
@@ -107,13 +140,7 @@ export function JudgingPage() {
             setPair(data);
             updateCategoryPair(filterCategory, data);
 
-            // Reset scores on new pair
-            setScores({
-                impact: 50,
-                technical: 50,
-                creativity: 50,
-                presentation: 50,
-            });
+            // Score reset handled by useEffect
         } catch (err) {
             console.error('Failed to fetch pair:', err);
         } finally {
@@ -121,19 +148,32 @@ export function JudgingPage() {
         }
     };
 
-    // Effect: Handle Category Switch
+    // Effect: Handle Category Switch + Initial Load
     useEffect(() => {
-        localStorage.setItem('duel_filter', filterCategory);
-
-        // 1. Try to load from cache
-        if (categoryPairs[filterCategory]) {
-            setPair(categoryPairs[filterCategory]);
-            return;
+        if (initialLoadParams) {
+            fetchPair(true); // Will trigger the target logic
+        } else {
+            localStorage.setItem('duel_filter', filterCategory);
+            // 1. Try to load from cache
+            if (categoryPairs[filterCategory]) {
+                setPair(categoryPairs[filterCategory]);
+                // We rely on the pair-change effect below to reset scores
+                return;
+            }
+            // 2. Else fetch new
+            fetchPair(true);
         }
+    }, [filterCategory, initialLoadParams]);
 
-        // 2. Else fetch new
-        fetchPair(true);
-    }, [filterCategory]);
+    // Effect: Reset scores whenever the pair changes
+    useEffect(() => {
+        setScores({
+            impact: 50,
+            technical: 50,
+            creativity: 50,
+            presentation: 50,
+        });
+    }, [pair?.project_a.id, pair?.project_b.id]);
 
     const handleCreateVote = async () => {
         if (!pair || submitting) return;
@@ -158,8 +198,15 @@ export function JudgingPage() {
                 rightWins ? pair.project_b.id : pair.project_a.id, // winner_id
                 rightWins ? pair.project_a.id : pair.project_b.id  // loser_id
             );
-            // Force fetch next pair
-            fetchPair(true);
+
+            // If we were in target mode, clear URL and return to normal pool
+            if (initialLoadParams) {
+                setInitialLoadParams(null);
+                navigate('/', { replace: true });
+            } else {
+                // Force fetch next pair
+                fetchPair(true);
+            }
         } catch (err) {
             console.error('Vote failed:', err);
         } finally {
@@ -168,8 +215,13 @@ export function JudgingPage() {
     };
 
     const handleSkip = () => {
-        updateCategoryPair(filterCategory, null);
-        fetchPair(true);
+        if (initialLoadParams) {
+            setInitialLoadParams(null);
+            navigate('/', { replace: true });
+        } else {
+            updateCategoryPair(filterCategory, null);
+            fetchPair(true);
+        }
     };
 
     const handleIgnore = async (projectId: string) => {
@@ -177,8 +229,14 @@ export function JudgingPage() {
         setSubmitting(true);
         try {
             await api.ignoreProject(projectId);
-            updateCategoryPair(filterCategory, null);
-            fetchPair(true);
+
+            if (initialLoadParams) {
+                setInitialLoadParams(null);
+                navigate('/', { replace: true });
+            } else {
+                updateCategoryPair(filterCategory, null);
+                fetchPair(true);
+            }
         } catch (err) {
             console.error('Failed to ignore project:', err);
         } finally {
