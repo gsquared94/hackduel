@@ -183,7 +183,15 @@ def health():
     return {"status": "ok", "project_count": len(repo.get_all())}
 
 @app.get("/projects/next-pair", response_model=PairResponse)
-def get_next_pair(category_filter: Optional[str] = None):
+def get_next_pair(request: Request, category_filter: Optional[str] = None):
+    iap_email = request.headers.get("X-Goog-Authenticated-User-Email")
+    judge_email = None
+    if iap_email:
+        # Format: accounts.google.com:user@example.com
+        if ":" in iap_email:
+            iap_email = iap_email.split(":")[-1]
+        judge_email = iap_email
+
     projects_list = repo.get_all()
     if len(projects_list) < 2:
         raise HTTPException(status_code=500, detail="Not enough projects")
@@ -198,19 +206,41 @@ def get_next_pair(category_filter: Optional[str] = None):
     # 1. Pick first project randomly
     p1 = random.choice(candidates)
     
-    # 2. Pick second project - Active Learning
+    # 2. Pick second project - Active Learning with History Penalty
     best_opponent = None
     best_quality = -1.0
     
-    opponents = random.sample(candidates, min(len(candidates), 20))
+    # Increase sample size to find fresh pairs
+    opponents = random.sample(candidates, min(len(candidates), 50))
+    
+    p1_history = getattr(p1, 'judged_by', [])
     
     for p2 in opponents:
         if p1.id == p2.id:
             continue
         
-        q = get_quality(p1, p2)
-        if q > best_quality:
-            best_quality = q
+        # A. Strict Personal History Filter
+        # If THIS judge has already judged this pair, skip entirely.
+        if judge_email and judge_email.lower() != "unknown":
+            has_seen = any(
+                j.opponent_id == p2.id and j.judge_email == judge_email 
+                for j in p1_history
+            )
+            if has_seen:
+                continue
+
+        # B. Global History Penalty
+        # Deprioritize pairs that have been judged by *anyone*
+        times_played_global = sum(1 for j in p1_history if j.opponent_id == p2.id)
+        
+        # Decay factor: 0.1 ^ matches (1 -> 0.1, 2 -> 0.01)
+        penalty = 0.1 ** times_played_global
+        
+        raw_quality = get_quality(p1, p2)
+        final_score = raw_quality * penalty
+        
+        if final_score > best_quality:
+            best_quality = final_score
             best_opponent = p2
             
     if not best_opponent:
