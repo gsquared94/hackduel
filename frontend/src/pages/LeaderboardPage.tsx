@@ -229,9 +229,9 @@ export default function LeaderboardPage() {
                                 <td className="p-4 text-right align-top pt-5">
                                     <span
                                         className="font-mono text-indigo-300 cursor-help text-lg"
-                                        title={`${p.matches_played || 0} matches played`}
+                                        title={`μ=${p.mu.toFixed(1)}, σ=${p.sigma.toFixed(1)} | ${p.matches_played || 0} matches`}
                                     >
-                                        {p.mu.toFixed(2)}
+                                        {(p.mu - 3 * p.sigma).toFixed(2)}
                                     </span>
                                 </td>
                             </tr>
