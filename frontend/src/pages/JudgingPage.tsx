@@ -461,9 +461,16 @@ function ProjectCard({ project, side, isWinning, onIgnore }: { project: Project;
     const isVideo = project.video_url && (project.video_url.includes('youtube') || project.video_url.includes('youtu.be'));
     const getEmbedUrl = (url: string | undefined) => {
         if (!url) return '';
-        if (url.includes('watch?v=')) return url.replace('watch?v=', 'embed/');
-        if (url.includes('youtu.be/')) return url.replace('youtu.be/', 'www.youtube.com/embed/');
-        if (url.includes('youtube.com/shorts/')) return url.replace('youtube.com/shorts/', 'www.youtube.com/embed/');
+        try {
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|shorts\/)([^#&?]*).*/;
+            const match = url.match(regExp);
+
+            if (match && match[2].length === 11) {
+                return `https://www.youtube.com/embed/${match[2]}`;
+            }
+        } catch (error) {
+            console.error('Error parsing URL:', error);
+        }
         return url;
     };
 
